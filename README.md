@@ -21,7 +21,7 @@ You need JDK 21 and Maven.
 
 ```bash
 mvn compile
-mvn exec:java -Dexec.mainClass=com.tidewater.freight.Demo
+mvn exec:java -Dexec.mainClass=com.tidewater.freight.app.Demo
 ```
 
 **Run the existing tests:**

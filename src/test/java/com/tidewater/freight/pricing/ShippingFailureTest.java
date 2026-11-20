@@ -1,4 +1,4 @@
-package com.tidewater.freight;
+package com.tidewater.freight.pricing;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -7,6 +7,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.tidewater.freight.exception.InvalidShipmentException;
+import com.tidewater.freight.exception.RateLookupException;
+import com.tidewater.freight.exception.UnknownZoneException;
+import com.tidewater.freight.rates.InMemoryRateRepository;
+import com.tidewater.freight.rates.RateRepository;
+import com.tidewater.freight.rates.ZoneRate;
 import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

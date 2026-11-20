@@ -1,4 +1,9 @@
-package com.tidewater.freight;
+package com.tidewater.freight.app;
+
+import com.tidewater.freight.exception.UnknownZoneException;
+import com.tidewater.freight.pricing.ShippingCalculator;
+import com.tidewater.freight.rates.InMemoryRateRepository;
+import com.tidewater.freight.rates.RateRepository;
 
 public class Demo {
   public static void main(String[] args) {

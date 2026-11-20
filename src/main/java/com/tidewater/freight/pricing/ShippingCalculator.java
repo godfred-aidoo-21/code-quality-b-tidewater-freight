@@ -1,5 +1,10 @@
-package com.tidewater.freight;
+package com.tidewater.freight.pricing;
 
+import com.tidewater.freight.exception.InvalidShipmentException;
+import com.tidewater.freight.exception.RateLookupException;
+import com.tidewater.freight.exception.UnknownZoneException;
+import com.tidewater.freight.rates.RateRepository;
+import com.tidewater.freight.rates.ZoneRate;
 import java.util.Objects;
 
 public class ShippingCalculator {

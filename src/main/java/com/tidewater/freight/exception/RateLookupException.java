@@ -1,4 +1,4 @@
-package com.tidewater.freight;
+package com.tidewater.freight.exception;
 
 /** The rate source failed to provide rules; this is distinct from an unknown zone. */
 public class RateLookupException extends ShippingException {

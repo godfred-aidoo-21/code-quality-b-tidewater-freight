@@ -1,4 +1,4 @@
-package com.tidewater.freight;
+package com.tidewater.freight.exception;
 
 /** No rate rules are configured for the requested zone. */
 public class UnknownZoneException extends ShippingException {

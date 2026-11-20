@@ -1,4 +1,7 @@
-package com.tidewater.freight;
+package com.tidewater.freight.rates;
+
+import com.tidewater.freight.exception.RateLookupException;
+import com.tidewater.freight.exception.UnknownZoneException;
 
 public interface RateRepository {
   /**

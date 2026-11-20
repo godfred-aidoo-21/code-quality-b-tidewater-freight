@@ -1,4 +1,4 @@
-package com.tidewater.freight;
+package com.tidewater.freight.exception;
 
 /** A shipment could not be priced. */
 public class ShippingException extends RuntimeException {

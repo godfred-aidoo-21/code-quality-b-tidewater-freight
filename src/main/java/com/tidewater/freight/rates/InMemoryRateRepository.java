@@ -1,5 +1,6 @@
-package com.tidewater.freight;
+package com.tidewater.freight.rates;
 
+import com.tidewater.freight.exception.UnknownZoneException;
 import java.util.Map;
 
 public class InMemoryRateRepository implements RateRepository {
