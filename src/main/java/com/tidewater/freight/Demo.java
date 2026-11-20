@@ -7,7 +7,11 @@ public class Demo {
 
     printCost(calculator, "DOMESTIC", 10, "STANDARD");
     printCost(calculator, "INTERNATIONAL", 40, "EXPRESS");
-    printCost(calculator, "MOON", 10, "STANDARD");
+    try {
+      printCost(calculator, "MOON", 10, "STANDARD");
+    } catch (UnknownZoneException e) {
+      System.err.println("Shipment rejected: " + e.getMessage());
+    }
   }
 
   private static void printCost(

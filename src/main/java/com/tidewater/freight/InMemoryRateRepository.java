@@ -20,7 +20,7 @@ public class InMemoryRateRepository implements RateRepository {
   public ZoneRate findRate(String zone) {
     ZoneRate rate = rates.get(zone);
     if (rate == null) {
-      throw new IllegalArgumentException("Unknown zone: " + zone);
+      throw new UnknownZoneException(zone);
     }
     return rate;
   }
