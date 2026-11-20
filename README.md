@@ -1,100 +1,202 @@
-# Tidewater Freight — Shipping Cost Service
+# Tidewater Freight
 
-This is the starter repository for the **Code Quality & Testing** applied lab.
-Read the lab brief alongside this repository; it explains the business, what you
-are being asked to deliver, and how your work is assessed.
+A small Java service that calculates shipment costs in Ghana cedis (GHS) from a
+shipment's weight, destination zone and service level. This repository contains the
+refactored service, its JUnit 5 and Mockito tests, and the Code Quality and Testing
+lab analysis.
 
-## What this is
+See [ANALYSIS.md](ANALYSIS.md) for the original diagnosis, AmaliTech section
+references, design decisions, what was kept or rewritten, and verification evidence.
 
-A small shipping-cost service that was written quickly with an AI assistant, together with the
-tests it produced. Everything compiles and the tests pass, so at a glance it
-looks finished. Your job is to bring it up to AmaliTech standard: judge what is
-actually wrong with the code **and** its tests, refactor it, make it genuinely
-testable, handle its failures properly, and replace the tests that only look
-like tests.
+## Requirements
 
-## Running it
+- JDK 21
+- Maven available as `mvn`
 
-You need JDK 21 and Maven.
+Run commands from the repository root. Maven downloads dependencies on the first run.
 
-**See the service run (a small demo, no tests):**
+## Run the demo
 
-```bash
+```powershell
 mvn compile
-mvn exec:java -Dexec.mainClass=com.tidewater.freight.app.Demo
+mvn exec:java "-Dexec.mainClass=com.tidewater.freight.app.Demo"
 ```
 
-**Run the existing tests:**
+The demo prints two prices to standard output and reports the unknown zone to
+standard error:
 
-```bash
+```text
+Result DOMESTIC 10.0kg STANDARD -> GHS 50.00
+Result INTERNATIONAL 40.0kg EXPRESS -> GHS 967.50
+Shipment rejected: Unknown shipping zone: MOON
+```
+
+The order of messages from the two streams can vary. A failed calculation throws
+an exception; it does not return a fallback price.
+
+## Pricing rules
+
+| Zone | Rate per kg | Handling fee |
+| --- | ---: | ---: |
+| DOMESTIC | GHS 5.00 | GHS 0.00 |
+| REGIONAL | GHS 8.00 | GHS 10.00 |
+| INTERNATIONAL | GHS 15.00 | GHS 25.00 |
+
+1. Multiply the zone's rate by the shipment weight and add its handling fee.
+2. Add GHS 20.00 when the weight is strictly greater than 30 kg.
+3. For EXPRESS, multiply the entire subtotal by 1.5. STANDARD has no multiplier.
+4. Round the final total once to two decimal places using `HALF_UP`.
+
+For example, international express at 40 kg costs
+`(15 x 40 + 25 + 20) x 1.5 = GHS 967.50`. Exactly 30 kg has no heavy-item surcharge.
+
+Rates, fees and results use `BigDecimal`. Intermediate amounts retain their
+precision: GHS 1.875 rounds to GHS 1.88 only at the final step.
+
+## Inputs and failures
+
+Weights must be positive and finite; fractional kilograms are accepted. Zone names
+must match configured keys exactly, and services must be `STANDARD` or `EXPRESS`.
+The service does not trim whitespace or normalize case.
+
+| Failure | Result |
+| --- | --- |
+| Missing zone, invalid weight or unsupported service | `InvalidShipmentException` |
+| Zone has no configured rules | `UnknownZoneException` |
+| Rate source fails or returns no rules | `RateLookupException`, with zone context and the original cause preserved |
+| Unexpected repository error | Propagates to the caller |
+| Missing repository at construction | `NullPointerException` with a descriptive message |
+| Null/non-positive configured rate or null/negative fee | `IllegalArgumentException` when constructing `ZoneRate` |
+
+The three shipping exceptions share the `ShippingException` parent. The demo
+handles the expected unknown-zone rejection by displaying it; the calculator leaves
+failure handling to its caller.
+
+## Using the calculator
+
+```java
+import com.tidewater.freight.pricing.ShippingCalculator;
+import com.tidewater.freight.rates.InMemoryRateRepository;
+import java.math.BigDecimal;
+
+ShippingCalculator calculator =
+    new ShippingCalculator(new InMemoryRateRepository());
+BigDecimal cost = calculator.calculateCost("REGIONAL", 5, "STANDARD");
+// cost is 50.00, with a scale of 2.
+```
+
+The repository is injected through the constructor. It returns a `ZoneRate` holding
+the rate and handling fee together. Its in-memory implementation accepts a map of
+rules and makes an immutable copy.
+
+To add a zone using the same formula, include its rules in the map supplied to
+`InMemoryRateRepository`. That map is the complete configuration, so include the
+existing zones that should remain available. The calculator needs no changes.
+`calculatesNewZonePriceFromSuppliedRules` demonstrates this in the test suite.
+
+## Project structure
+
+```text
+.
+|-- ANALYSIS.md                         # Diagnosis, decisions and verification evidence
+|-- README.md                           # Project overview and run commands
+|-- pom.xml                             # Dependencies, build and quality checks
+|-- .gitignore                          # Files excluded from Git
+`-- src/
+    |-- main/java/com/tidewater/freight/
+    |   |-- app/
+    |   |   `-- Demo.java                # Runs examples and displays prices or errors
+    |   |-- pricing/
+    |   |   `-- ShippingCalculator.java  # Validates shipments and calculates rounded costs
+    |   |-- rates/
+    |   |   |-- RateRepository.java      # Contract for retrieving zone rules
+    |   |   |-- InMemoryRateRepository.java # Stores and looks up configured rules
+    |   |   `-- ZoneRate.java            # Holds and validates decimal rates and fees
+    |   `-- exception/
+    |       |-- ShippingException.java   # Parent for shipping failures
+    |       |-- InvalidShipmentException.java # Invalid shipment details
+    |       |-- UnknownZoneException.java # Zone has no configured rules
+    |       `-- RateLookupException.java # Rate-source failure, with cause and context
+    `-- test/java/com/tidewater/freight/
+        |-- app/
+        |   `-- DemoTest.java            # Checks price and rejection output
+        |-- pricing/
+        |   |-- ShippingCalculatorTest.java # Checks prices, boundaries and rounding
+        |   `-- ShippingFailureTest.java # Checks validation and failure propagation
+        `-- rates/
+            |-- InMemoryRateRepositoryTest.java # Checks rules and defensive copying
+            `-- ZoneRateTest.java        # Checks valid and invalid rates and fees
+```
+
+## Tests and verification
+
+Run the unit and demo-output tests:
+
+```powershell
 mvn test
 ```
 
-**Measure your tests** (coverage and mutation testing are already set up):
+Run tests and generate the JaCoCo coverage report:
 
-```bash
-mvn verify                                                  # tests + JaCoCo report: target/site/jacoco/index.html
-mvn test-compile org.pitest:pitest-maven:mutationCoverage   # PIT report: target/pit-reports/index.html
+```powershell
+mvn clean verify
 ```
 
-Run the demo and the tests before you change anything. Note what the demo prints for an unknown zone,
-and look carefully at whether the tests that pass actually prove anything.
+Run the full submission check, including the mutation threshold:
 
-## What to hand in
-
-See the lab brief for the full list: your written analysis (of the code and the
-tests), the refactored code, robust exception handling, a real test suite, a
-short rationale, and one improvement beyond the brief. You will talk through your
-work in a live review.
-
-## Extra improvement: enforce mutation results
-
-The starter could produce a PIT report, but a weak mutation score did not fail the build.
-The `mutation-check` profile turns that report into a build check:
-
-```shell
+```powershell
 mvn clean verify -Pmutation-check
 ```
 
-This runs the tests, generates JaCoCo coverage, and runs PIT. The build fails if the
-mutation score is below 100% or PIT finds no mutations. Ordinary `mvn test` runs stay
-quick because the profile is opt-in. Run the profile before submitting changes; it
-can also be used as a CI build command.
+| Report | Location |
+| --- | --- |
+| JUnit results | `target/surefire-reports/` |
+| JaCoCo coverage | `target/site/jacoco/index.html` |
+| PIT mutation results | `target/pit-reports/index.html` |
+| PIT machine-readable results, with the profile | `target/pit-reports/mutations.xml` |
 
-The current suite catches all 25 mutations generated by the configured operators,
-so 100% preserves the result we already achieve. This matters here because the
-starter's green tests did not establish correct prices. If a later test change
-allows a pricing mutation to escape, the check makes that regression visible.
+The latest verified run passed all **63 test executions**, with no failures, errors
+or skipped tests. JaCoCo reports **100% line, instruction and branch coverage**.
+PIT generated **21 mutations, all caught**. Tests cover prices, boundaries, decimal
+rounding, invalid inputs, repository failures, new-zone support and visible errors.
+Mockito replaces repository dependencies; tests exercise the real calculator.
 
-Reports are written to `target/pit-reports/index.html` and
-`target/pit-reports/mutations.xml`. Generated reports should not be committed.
+PIT's 98% line coverage for mutated classes differs from JaCoCo's 100% because PIT
+counts Demo's unused private constructor. The current PIT configuration generates
+no mutations for the record constructor and does not mutate every `BigDecimal`
+operation. Direct tests cover those guards and decimal calculations. A perfect
+mutation score is evidence for the generated mutations, not proof against every bug.
 
-A mutation score only describes the mutations PIT generates. It does not prove
-that every possible bug is covered. If a future change produces an equivalent
-mutation, investigate and document it rather than adding a meaningless assertion
-or silently lowering the threshold.
+## Extra improvement: enforce mutation results
 
-PIT's threshold and reporting options are described in its
-[Maven documentation](https://pitest.org/quickstart/maven/).
+The starter could generate a PIT report without rejecting a weak score. The
+`mutation-check` profile binds PIT to Maven's verify phase and fails the build if
+the mutation score is below 100% or no mutations are generated. It is opt-in so
+ordinary test runs stay quick, and can be used as a CI command.
 
-### Checking the build check
+The failure path was checked when the profile was introduced: excluding pricing
+tests from PIT left all 48 ordinary tests passing, but let three of 25 mutations
+survive. Maven rejected the 88% score. A subsequent full run passed. The experiment
+and command are recorded in [ANALYSIS.md](ANALYSIS.md#decisions).
 
-When the check was introduced, the full profile passed with 48 tests and 25 of 25 mutations caught. JaCoCo
-reported 100% line, instruction and branch coverage.
+Generated reports and compiled output belong in `target/` and are excluded from Git.
 
-To check the failure path, pricing tests were temporarily excluded from PIT only:
+## Assumptions and limits
 
-```shell
-mvn verify -Pmutation-check "-DexcludedTestClasses=com.tidewater.freight.pricing.*"
-```
+The existing rates, shared heavy-item surcharge and express policy were retained.
+The following decisions still need business confirmation:
 
-All 48 ordinary tests still passed, but PIT caught only 22 of 25 mutations (88%).
-Maven failed with `Mutation score of 88 is below threshold of 100`. No test files
-were edited for this experiment. A subsequent clean run with the full suite passed
-and replaced the experiment's reports. The exclusion command is a diagnostic check,
-not the command to use for normal verification.
+- `HALF_UP` rounding to two decimal places, with no minimum charge. A positive
+  amount below GHS 0.005 can round to GHS 0.00; this is distinct from a failed quote.
+- Exact, case-sensitive zone and service names, with no input normalization.
+- Positive fractional weights with no business maximum imposed.
+- The coming zone using the same formula with different rates and handling fees.
+  A different surcharge or calculation policy would need a behavior extension.
 
-After adding ZoneRate validation, the full profile passes with 59 tests and the same
-25 mutations caught. JaCoCo still reports 100% line, instruction and branch coverage.
-PIT generated no mutations for the record constructor; its new guards are checked
-by direct tests, rather than included in that mutation score.
+Weight enters the API as a `double` and is converted with `BigDecimal.valueOf`.
+This avoids introducing binary floating-point arithmetic into the money calculation,
+but cannot recover precision already lost in the caller's weight value. Construct
+configured monetary values from decimal strings and retain the `BigDecimal` result.
+
+No hosted CI workflow has been added. The verification profile can be run locally
+or wired into a pipeline. Reviewer feedback should be recorded when obtained.
