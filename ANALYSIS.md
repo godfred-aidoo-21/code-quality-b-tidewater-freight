@@ -21,7 +21,7 @@ The demo returned:
 
 The first two amounts match the formula in the code. The third is the main concern: the service could not price the shipment, but returned an amount anyway.
 
-The references below are to the supplied *AmaliTech Coding Standards: Java Edition (2026 draft)*. Findings are ranked by their effect on pricing, testing and the coming zone change. Line numbers refer to the starter, before refactoring.
+ Findings are ranked by their effect on pricing, testing and the coming zone change. Line numbers refer to the starter, before refactoring.
 
 ## Problems in the code, in priority order
 
@@ -124,3 +124,98 @@ The main SOLID problems are that the calculator does several jobs (SRP), needs e
 There are useful parts to keep: the repository interface, the small in-memory implementation, and the demo's valid examples. The current formula is a starting point, subject to confirmation of the business rules.
 
 
+
+## Decisions
+
+This section records the work completed after the initial diagnosis. The findings above describe the starter and have been kept as they were, including its original file locations and commands.
+
+### Separate pricing, rate lookup and output
+
+`ShippingCalculator` now receives a `RateRepository` through its constructor. `Demo` chooses the in-memory implementation. Tests can supply a different repository without changing the calculator, which addresses DIP (section 12.5).
+
+The calculator handles pricing and validates the details needed for that calculation. It no longer prints anything. `Demo` handles console output and reports an unknown zone as a rejected shipment. This separates presentation from pricing under SRP and sections 4.2 and 4.4. I kept the arithmetic together rather than creating a class for every fee or multiplication.
+
+The files are grouped into `pricing`, `rates`, `exception` and `app`, with tests in matching packages. Each public class has its own file, as required by section 11.1. Shared pricing values now have named constants (section 3.4).
+
+### Keep zone rates and fees together
+
+The repository now returns a `ZoneRate` record containing the per-kilogram rate and fixed handling fee. The calculator uses those values directly, so it no longer needs to recognize DOMESTIC, REGIONAL or INTERNATIONAL in an `if/else` chain.
+
+The in-memory repository accepts a map of zone rules and copies it on construction. A caller changing its original map cannot change the repository's prices afterwards.
+
+A new zone using the same formula can be added to the supplied map without editing `ShippingCalculator`. The test `calculatesNewZonePriceFromSuppliedRules` supplies NEW_ZONE with a rate of 12 and fee of 7. For 40 kg express, it checks `(12 x 40 + 7 + 20) x 1.5 = 760.5`.
+
+This addresses the known extension under OCP (section 12.2), without adding a framework that the current rules do not need (section 2.2). It has a limit: a zone with a different surcharge policy or calculation formula would need a behavior extension. The actual new zone's rules have not been supplied, so support for every possible future formula is not claimed.
+
+### Make failures visible
+
+The catch-all block and zero-price fallback were removed. The exceptions distinguish problems that callers may need to handle differently:
+
+- `InvalidShipmentException`: missing zone, invalid weight or unsupported service.
+- `UnknownZoneException`: no rules are configured for the requested zone.
+- `RateLookupException`: the rate source failed or returned no rules.
+- `ShippingException`: the shared parent for these shipping failures.
+
+The calculator catches only `RateLookupException` from the lookup path. It adds the requested zone and keeps the original exception as the cause, following sections 6.1 and 6.3. Unknown-zone exceptions pass through unchanged. Unexpected repository errors also propagate; they are not relabeled as invalid requests or hidden behind a price.
+
+The in-memory source has no file or network operation to recover from. The rate-source failure test therefore uses a mock to simulate an adapter failure with an underlying IOException. It verifies the cause chain; it does not claim to test a real file adapter.
+
+A missing repository is rejected at construction. A calculated NaN or infinite amount is rejected with `ArithmeticException`. In the demo, the expected unknown-zone failure is displayed on standard error and no price is printed for it. Other unexpected failures remain unhandled by that display code.
+
+### What was kept and what was rewritten
+
+| Inherited part | Decision and reason |
+| --- | --- |
+| Existing rates, fees and calculation order | Kept for valid shipments. Express still multiplies the full subtotal, and the heavy surcharge still applies only above 30 kg. |
+| `RateRepository` | Kept the abstraction and changed its result from a bare number to complete zone rules. |
+| `InMemoryRateRepository` | Kept the small adapter; replaced the internally populated mutable map with supplied, copied rules and defaults. |
+| `ShippingCalculator` | Refactored construction and zone selection; removed output and swallowed failures; added input checks. |
+| `Demo` | Kept the three examples, moved presentation here, and made the static-only class non-instantiable. MOON now produces an explicit rejection. |
+| Three AI-written tests | Replaced their assertions and setup. The useful shipment examples remain, but tests now exercise a real calculator and assert expected amounts. |
+| Maven test and reporting tools | Kept JUnit 5, Mockito, JaCoCo and PIT. Added enforcement through the mutation-check profile. |
+
+### How the changes were checked
+
+The suite has **48 test executions across four test classes**. Parameterized methods account for many of those executions. It checks zone/service prices, heavy and fractional shipments, weights below/at/above the threshold, invalid inputs, overflow, failure propagation and preserved causes. Repository tests check configured values and the defensive copy. The demo test checks both successful output and rejection output, restoring the streams and formatting locale afterwards.
+
+Mockito is used for the repository seam, never to replace the calculator being tested. Interaction checks supplement assertions about prices or exceptions. Six repeated cases were removed after review, while the important behavior checks and measured coverage remained.
+
+The final verification command was:
+
+```shell
+mvn clean verify -Pmutation-check
+```
+
+| Check | Result |
+| --- | --- |
+| JUnit | 48 passed; no failures, errors or skipped tests |
+| JaCoCo instructions | 262 covered, 0 missed |
+| JaCoCo lines | 60 covered, 0 missed |
+| JaCoCo branches | 22 covered, 0 missed |
+| PIT | 25 mutations generated, 25 killed; no survivors or uncovered mutations |
+
+PIT reports 47/48 covered lines for mutated classes because it counts Demo's unused private constructor. JaCoCo filters that constructor and reports 100%. These tools use different coverage accounting; no production code was excluded to hide a pricing gap.
+
+The tests give specific checks for a live rule change: `providesTheConfiguredRateAndHandlingFee` checks rate and fee values, `calculatesPriceFromZoneRateFeesAndService` checks totals and express behavior, and `addsHeavyItemSurchargeOnlyAboveThirtyKg` checks the surcharge boundary.
+
+### Extra improvement: fail the build when mutation results regress
+
+PIT was already present in the starter. Running it alone was not the extra improvement. The new `mutation-check` profile binds PIT to Maven's verify phase and sets a 100% mutation threshold. It also fails when no mutations are generated and writes HTML and XML reports. The profile is opt-in so ordinary unit-test runs stay quick.
+
+This protects the part of the project that was most misleading at the start: a green suite with weak assertions. The existing suite catches all generated mutations, so the threshold preserves that result for later changes.
+
+I checked the failure path with:
+
+```shell
+mvn verify -Pmutation-check "-DexcludedTestClasses=com.tidewater.freight.pricing.*"
+```
+
+All 48 ordinary tests passed, but excluding pricing tests from PIT allowed three mutations to survive. The score fell to 88%, and Maven failed with `Mutation score of 88 is below threshold of 100`. No source or test files were changed for this experiment. The subsequent full clean run passed and restored the final reports.
+
+A 100% mutation score only covers PIT's generated mutations. Future equivalent mutations need investigation, not meaningless assertions or an unexplained threshold reduction. The profile is available for CI, but no hosted CI pipeline has been added.
+
+### Assumptions and remaining limits
+
+The implementation accepts positive, finite fractional weights, with no invented business maximum. Zone lookup is exact and case-sensitive. Services must be exactly STANDARD or EXPRESS; input is not trimmed or normalized. These choices are documented implementation assumptions, not recorded business approval.
+
+The calculation still returns `double`. It does not round fractional weights or apply a final monetary rounding policy; only the demo formats prices to two decimal places. Decimal-money representation and payable rounding remain unresolved. The overflow check does not solve floating-point precision, and configured `ZoneRate` values are currently trusted rather than validated.
