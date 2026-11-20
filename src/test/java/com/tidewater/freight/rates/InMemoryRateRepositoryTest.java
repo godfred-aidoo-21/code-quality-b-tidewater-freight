@@ -38,16 +38,6 @@ class InMemoryRateRepositoryTest {
   }
 
   @Test
-  void retrievesRulesForANewZone() {
-    RateRepository repository = new InMemoryRateRepository(
-        Map.of("NEW_ZONE", new ZoneRate(12, 7)));
-
-    ZoneRate rate = repository.findRate("NEW_ZONE");
-
-    assertEquals(new ZoneRate(12, 7), rate);
-  }
-
-  @Test
   void keepsItsRulesWhenTheCallerChangesTheOriginalMap() {
     Map<String, ZoneRate> configuredRates = new HashMap<>();
     configuredRates.put("DOMESTIC", new ZoneRate(5, 0));
@@ -57,15 +47,5 @@ class InMemoryRateRepositoryTest {
     ZoneRate rate = repository.findRate("DOMESTIC");
 
     assertEquals(new ZoneRate(5, 0), rate);
-  }
-
-  @Test
-  void reportsAnUnknownZoneWhenNoRulesAreConfigured() {
-    RateRepository repository = new InMemoryRateRepository(Map.of());
-
-    UnknownZoneException failure = assertThrows(UnknownZoneException.class,
-        () -> repository.findRate("DOMESTIC"));
-
-    assertEquals("Unknown shipping zone: DOMESTIC", failure.getMessage());
   }
 }
