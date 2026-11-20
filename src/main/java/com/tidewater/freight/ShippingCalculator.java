@@ -1,39 +1,28 @@
 package com.tidewater.freight;
 
 public class ShippingCalculator {
+  private static final double HEAVY_ITEM_THRESHOLD_KG = 30.0;
+  private static final double HEAVY_ITEM_SURCHARGE = 20.0;
+  private static final double EXPRESS_MULTIPLIER = 1.5;
 
-    // The calculator makes its own rate source, so callers and tests cannot give it another.
-    private final RateRepository repository = new InMemoryRateRepository();
+  private final RateRepository repository;
 
-    public double calculateCost(String zone, double weightKg, String serviceLevel) {
-        try {
-            double rate = repository.findRate(zone);
-            double cost = rate * weightKg;
+  public ShippingCalculator(RateRepository repository) {
+    this.repository = repository;
+  }
 
-            // zone-specific fees
-            if (zone.equals("DOMESTIC")) {
-                // no extra fee
-            } else if (zone.equals("REGIONAL")) {
-                cost = cost + 10; // handling fee
-            } else if (zone.equals("INTERNATIONAL")) {
-                cost = cost + 25; // customs handling
-            }
-
-            // heavy-item surcharge
-            if (weightKg > 30) {
-                cost = cost + 20;
-            }
-
-            // express costs more
-            if (serviceLevel.equals("EXPRESS")) {
-                cost = cost * 1.5;
-            }
-
-            System.out.println("Shipping " + zone + " (" + weightKg + "kg, " + serviceLevel + "): GHS " + cost);
-            return cost;
-        } catch (Exception e) {
-            // could not work out a rate (for example an unknown zone) - return zero
-            return 0;
-        }
+  public double calculateCost(String zone, double weightKg, String serviceLevel) {
+    try {
+      ZoneRate rate = repository.findRate(zone);
+      double subtotal = rate.ratePerKg() * weightKg + rate.handlingFee();
+      subtotal += heavyItemSurcharge(weightKg);
+      return serviceLevel.equals("EXPRESS") ? subtotal * EXPRESS_MULTIPLIER : subtotal;
+    } catch (Exception e) {
+      return 0;
     }
+  }
+
+  private double heavyItemSurcharge(double weightKg) {
+    return weightKg > HEAVY_ITEM_THRESHOLD_KG ? HEAVY_ITEM_SURCHARGE : 0.0;
+  }
 }

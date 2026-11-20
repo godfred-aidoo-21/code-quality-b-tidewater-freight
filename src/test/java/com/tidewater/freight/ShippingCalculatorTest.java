@@ -1,31 +1,62 @@
 package com.tidewater.freight;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class ShippingCalculatorTest {
+  @ParameterizedTest
+  @CsvSource({
+      "DOMESTIC, 10, STANDARD, 50.0",
+      "DOMESTIC, 10, EXPRESS, 75.0",
+      "REGIONAL, 5, STANDARD, 50.0",
+      "REGIONAL, 5, EXPRESS, 75.0",
+      "INTERNATIONAL, 10, STANDARD, 175.0",
+      "INTERNATIONAL, 40, EXPRESS, 967.5"
+  })
+  void calculatesPriceFromZoneRateFeesAndService(
+      String zone, double weightKg, String serviceLevel, double expectedCost) {
+    ShippingCalculator calculator = new ShippingCalculator(new InMemoryRateRepository());
 
-    @Test
-    void calculatesACost() {
-        ShippingCalculator calculator = new ShippingCalculator();
-        double cost = calculator.calculateCost("DOMESTIC", 10, "STANDARD");
-        assertTrue(cost > 0); // it returned a cost
-    }
+    double cost = calculator.calculateCost(zone, weightKg, serviceLevel);
 
-    @Test
-    void calculatesExpressCost() {
-        // mock the calculator and check it returns what we told it to
-        ShippingCalculator calculator = mock(ShippingCalculator.class);
-        when(calculator.calculateCost("INTERNATIONAL", 40, "EXPRESS")).thenReturn(967.5);
-        assertEquals(967.5, calculator.calculateCost("INTERNATIONAL", 40, "EXPRESS"));
-    }
+    assertEquals(expectedCost, cost, 0.000001);
+  }
 
-    @Test
-    void returnsACostForAShipment() {
-        ShippingCalculator calculator = new ShippingCalculator();
-        double cost = calculator.calculateCost("REGIONAL", 5, "STANDARD");
-        assertNotNull(cost); // a result came back
-    }
+  @ParameterizedTest
+  @CsvSource({"29.9, 149.5", "30, 150.0", "30.1, 170.5"})
+  void addsHeavyItemSurchargeOnlyAboveThirtyKg(double weightKg, double expectedCost) {
+    ShippingCalculator calculator = new ShippingCalculator(new InMemoryRateRepository());
+
+    double cost = calculator.calculateCost("DOMESTIC", weightKg, "STANDARD");
+
+    assertEquals(expectedCost, cost, 0.000001);
+  }
+
+  @Test
+  void calculatesPriceUsingAnInjectedRepository() {
+    RateRepository repository = mock(RateRepository.class);
+    when(repository.findRate("DOMESTIC")).thenReturn(new ZoneRate(7.0, 3.0));
+    ShippingCalculator calculator = new ShippingCalculator(repository);
+
+    double cost = calculator.calculateCost("DOMESTIC", 10, "STANDARD");
+
+    assertEquals(73.0, cost, 0.000001);
+  }
+
+  @Test
+  void calculatesNewZonePriceFromSuppliedRules() {
+    RateRepository repository = new InMemoryRateRepository(
+        Map.of("NEW_ZONE", new ZoneRate(12.0, 7.0)));
+    ShippingCalculator calculator = new ShippingCalculator(repository);
+
+    double cost = calculator.calculateCost("NEW_ZONE", 40, "EXPRESS");
+
+    assertEquals(760.5, cost, 0.000001);
+  }
 }
