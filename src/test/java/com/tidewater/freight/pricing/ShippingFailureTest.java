@@ -24,7 +24,7 @@ class ShippingFailureTest {
   private final ShippingCalculator calculator = new ShippingCalculator(repository);
 
   @ParameterizedTest
-  @ValueSource(doubles = {0, -1, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY})
+  @ValueSource(doubles = {0, -0.0, -1, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY})
   void rejectsInvalidWeightBeforeLookingUpRates(double weightKg) {
     InvalidShipmentException failure = assertThrows(InvalidShipmentException.class,
         () -> calculator.calculateCost("DOMESTIC", weightKg, "STANDARD"));
@@ -115,5 +115,26 @@ class ShippingFailureTest {
         () -> calculator.calculateCost("DOMESTIC", Double.MAX_VALUE, "STANDARD"));
 
     assertEquals("Shipping cost is not finite for zone DOMESTIC", failure.getMessage());
+  }
+
+  @Test
+  void rejectsOverflowCausedByTheExpressMultiplier() {
+    when(repository.findRate("DOMESTIC")).thenReturn(new ZoneRate(1, 0));
+
+    ArithmeticException failure = assertThrows(ArithmeticException.class,
+        () -> calculator.calculateCost("DOMESTIC", Double.MAX_VALUE, "EXPRESS"));
+
+    assertEquals("Shipping cost is not finite for zone DOMESTIC", failure.getMessage());
+  }
+
+  @Test
+  void letsTheCallerRecognizeAnUnknownZoneFromTheRepository() {
+    UnknownZoneException missingZone = new UnknownZoneException("NEW_ZONE");
+    when(repository.findRate("NEW_ZONE")).thenThrow(missingZone);
+
+    UnknownZoneException failure = assertThrows(UnknownZoneException.class,
+        () -> calculator.calculateCost("NEW_ZONE", 10, "STANDARD"));
+
+    assertSame(missingZone, failure);
   }
 }
