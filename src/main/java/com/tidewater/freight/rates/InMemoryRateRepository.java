@@ -9,9 +9,9 @@ public class InMemoryRateRepository implements RateRepository {
 
   public InMemoryRateRepository() {
     this(Map.of(
-        "DOMESTIC", new ZoneRate(new BigDecimal("5.0"), new BigDecimal("0.0")),
-        "REGIONAL", new ZoneRate(new BigDecimal("8.0"), new BigDecimal("10.0")),
-        "INTERNATIONAL", new ZoneRate(new BigDecimal("15.0"), new BigDecimal("25.0"))));
+        "DOMESTIC", new ZoneRate(new BigDecimal("5.00"), new BigDecimal("0.00")),
+        "REGIONAL", new ZoneRate(new BigDecimal("8.00"), new BigDecimal("10.00")),
+        "INTERNATIONAL", new ZoneRate(new BigDecimal("15.00"), new BigDecimal("25.00"))));
   }
 
   public InMemoryRateRepository(Map<String, ZoneRate> rates) {

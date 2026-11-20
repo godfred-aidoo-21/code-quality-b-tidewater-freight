@@ -1,6 +1,7 @@
 package com.tidewater.freight.pricing;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
@@ -70,11 +71,13 @@ class ShippingFailureTest {
 
   @Test
   void reportsRepositoryContractFailureWhenRulesAreNull() {
+    when(repository.findRate("DOMESTIC")).thenReturn(null);
+
     RateLookupException failure = assertThrows(RateLookupException.class,
         () -> calculator.calculateCost("DOMESTIC", 10, "STANDARD"));
 
-    assertEquals("Could not retrieve shipping rules for zone DOMESTIC", failure.getMessage());
-    assertEquals("Rate repository returned no rules", failure.getCause().getMessage());
+    assertEquals("Rate repository returned no rules for zone DOMESTIC", failure.getMessage());
+    assertNull(failure.getCause());
   }
 
   @Test

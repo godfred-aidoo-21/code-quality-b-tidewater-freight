@@ -15,7 +15,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 class InMemoryRateRepositoryTest {
   @ParameterizedTest
-  @CsvSource({"DOMESTIC, 5.0, 0.0", "REGIONAL, 8.0, 10.0", "INTERNATIONAL, 15.0, 25.0"})
+  @CsvSource({"DOMESTIC, 5.00, 0.00", "REGIONAL, 8.00, 10.00", "INTERNATIONAL, 15.00, 25.00"})
   void providesTheConfiguredRateAndHandlingFee(
       String zone, BigDecimal expectedRatePerKg, BigDecimal expectedHandlingFee) {
     RateRepository repository = new InMemoryRateRepository();

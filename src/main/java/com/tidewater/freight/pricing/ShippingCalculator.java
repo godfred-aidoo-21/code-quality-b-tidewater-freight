@@ -35,7 +35,7 @@ public class ShippingCalculator {
     BigDecimal subtotal = rate.ratePerKg().multiply(BigDecimal.valueOf(weightKg))
         .add(rate.handlingFee())
         .add(heavyItemSurcharge(weightKg));
-    BigDecimal cost = serviceLevel.equals("EXPRESS")
+    BigDecimal cost = "EXPRESS".equals(serviceLevel)
         ? subtotal.multiply(EXPRESS_MULTIPLIER) : subtotal;
     return cost.setScale(CURRENCY_SCALE, RoundingMode.HALF_UP);
   }
@@ -53,15 +53,16 @@ public class ShippingCalculator {
   }
 
   private ZoneRate findRate(String zone) {
+    ZoneRate rate;
     try {
-      ZoneRate rate = repository.findRate(zone);
-      if (rate == null) {
-        throw new RateLookupException("Rate repository returned no rules");
-      }
-      return rate;
+      rate = repository.findRate(zone);
     } catch (RateLookupException e) {
       throw new RateLookupException("Could not retrieve shipping rules for zone " + zone, e);
     }
+    if (rate == null) {
+      throw new RateLookupException("Rate repository returned no rules for zone " + zone);
+    }
+    return rate;
   }
 
   private BigDecimal heavyItemSurcharge(double weightKg) {

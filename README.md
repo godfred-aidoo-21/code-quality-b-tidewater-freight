@@ -13,7 +13,8 @@ references, design decisions, what was kept or rewritten, and verification evide
 - JDK 21
 - Maven available as `mvn`
 
-Run commands from the repository root. Maven downloads dependencies on the first run.
+Run commands from the repository root in PowerShell or a POSIX shell such as Bash.
+Maven downloads dependencies on the first run.
 
 ## Run the demo
 
@@ -63,14 +64,15 @@ The service does not trim whitespace or normalize case.
 | --- | --- |
 | Missing zone, invalid weight or unsupported service | `InvalidShipmentException` |
 | Zone has no configured rules | `UnknownZoneException` |
-| Rate source fails or returns no rules | `RateLookupException`, with zone context and the original cause preserved |
+| Rate source fails or returns no rules | `RateLookupException`, with zone context and any original cause preserved |
 | Unexpected repository error | Propagates to the caller |
 | Missing repository at construction | `NullPointerException` with a descriptive message |
 | Null/non-positive configured rate or null/negative fee | `IllegalArgumentException` when constructing `ZoneRate` |
 
 The three shipping exceptions share the `ShippingException` parent. The demo
 handles the expected unknown-zone rejection by displaying it; the calculator leaves
-failure handling to its caller.
+failure handling to its caller. A production caller is responsible for logging or
+reporting these failures; the demo reports expected rejections on standard error.
 
 ## Using the calculator
 
@@ -155,7 +157,7 @@ mvn clean verify -Pmutation-check
 | PIT mutation results | `target/pit-reports/index.html` |
 | PIT machine-readable results, with the profile | `target/pit-reports/mutations.xml` |
 
-The latest verified run passed all **63 test executions**, with no failures, errors
+The latest verified run passed all **61 test executions**, with no failures, errors
 or skipped tests. JaCoCo reports **100% line, instruction and branch coverage**.
 PIT generated **21 mutations, all caught**. Tests cover prices, boundaries, decimal
 rounding, invalid inputs, repository failures, new-zone support and visible errors.
@@ -198,5 +200,6 @@ This avoids introducing binary floating-point arithmetic into the money calculat
 but cannot recover precision already lost in the caller's weight value. Construct
 configured monetary values from decimal strings and retain the `BigDecimal` result.
 
-No hosted CI workflow has been added. The verification profile can be run locally
-or wired into a pipeline. Reviewer feedback should be recorded when obtained.
+No hosted CI workflow has been added. Mutation-score enforcement is opt-in:
+`mvn verify` generates coverage but does not run or enforce PIT. Use
+`mvn clean verify -Pmutation-check` for the full quality check.

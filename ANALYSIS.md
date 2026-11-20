@@ -113,7 +113,7 @@ The wildcard static imports at lines 5-6 are a separate style violation of **sec
 
 There are no meaningful checks for handling fees, real express calculations, or the heavy-item boundary. In particular, tests should distinguish weights below 30 kg, exactly 30 kg and above 30 kg. They should also cover fractional amounts, invalid inputs, unknown zones and repository failures. A new-zone example should show that the calculator can use new rules without modification.
 
-**Section 9 requires 100% statement and branch coverage with meaningful assertions.** I have not measured coverage or mutation scores yet. PIT is already configured and can help check whether the replacement tests catch changed rates, fees and conditions.
+**Section 9 requires 100% statement and branch coverage with meaningful assertions.** At this initial diagnosis, coverage and mutation scores had not been measured. The final results are recorded under [How the changes were checked](#how-the-changes-were-checked). PIT is already configured and can help check whether the replacement tests catch changed rates, fees and conditions.
 
 ## What matters most before refactoring
 
@@ -158,11 +158,11 @@ The catch-all block and zero-price fallback were removed. The exceptions disting
 - `RateLookupException`: the rate source failed or returned no rules.
 - `ShippingException`: the shared parent for these shipping failures.
 
-The calculator catches only `RateLookupException` from the lookup path. It adds the requested zone and keeps the original exception as the cause, following sections 6.1 and 6.3. Unknown-zone exceptions pass through unchanged. Unexpected repository errors also propagate; they are not relabeled as invalid requests or hidden behind a price.
+The calculator catches only `RateLookupException` thrown by the repository lookup. A null returned rule is checked after the catch and reported directly with zone context; it has no underlying exception to preserve. It adds the requested zone and keeps the original exception as the cause, following sections 6.1 and 6.3. Unknown-zone exceptions pass through unchanged. Unexpected repository errors also propagate; they are not relabeled as invalid requests or hidden behind a price.
 
 The in-memory source has no file or network operation to recover from. The rate-source failure test therefore uses a mock to simulate an adapter failure with an underlying IOException. It verifies the cause chain; it does not claim to test a real file adapter.
 
-A missing repository is rejected at construction. Monetary arithmetic now uses BigDecimal, so the earlier double-overflow guards and their tests were replaced with tests that verify large exact amounts. Invalid non-finite shipment weights are still rejected. In the demo, the expected unknown-zone failure is displayed on standard error and no price is printed for it. Other unexpected failures remain unhandled by that display code.
+A missing repository is rejected at construction. Monetary arithmetic now uses BigDecimal, so the earlier double-overflow guards and their tests were replaced with decimal arithmetic and rounding checks. The later cleanup removed the unrealistic beyond-double-range examples. Invalid non-finite shipment weights are still rejected. In the demo, the expected unknown-zone failure is displayed on standard error and no price is printed for it. Other unexpected failures remain unhandled by that display code.
 
 ### What was kept and what was rewritten
 
@@ -178,7 +178,7 @@ A missing repository is rejected at construction. Monetary arithmetic now uses B
 
 ### How the changes were checked
 
-The suite has **63 test executions across five test classes**. Parameterized methods account for many of those executions. It checks zone/service prices, heavy and fractional shipments, weights below/at/above the threshold, invalid inputs, monetary rounding, large amounts, failure propagation and preserved causes. Repository tests check configured values and the defensive copy. The demo test checks both successful output and rejection output, restoring the streams and formatting locale afterwards.
+The suite has **61 test executions across five test classes**. Parameterized methods account for many of those executions. It checks zone/service prices, heavy and fractional shipments, weights below/at/above the threshold, invalid inputs, monetary rounding, failure propagation and preserved causes. Repository tests check configured values and the defensive copy. The demo test checks both successful output and rejection output, restoring the streams and formatting locale afterwards.
 
 Mockito is used for the repository seam, never to replace the calculator being tested. Interaction checks supplement assertions about prices or exceptions. Six repeated cases were removed after review, while the important behavior checks and measured coverage remained.
 
@@ -190,13 +190,13 @@ mvn clean verify -Pmutation-check
 
 | Check | Result |
 | --- | --- |
-| JUnit | 63 passed; no failures, errors or skipped tests |
-| JaCoCo instructions | 303 covered, 0 missed |
-| JaCoCo lines | 67 covered, 0 missed |
+| JUnit | 61 passed; no failures, errors or skipped tests |
+| JaCoCo instructions | 305 covered, 0 missed |
+| JaCoCo lines | 68 covered, 0 missed |
 | JaCoCo branches | 28 covered, 0 missed |
 | PIT | 21 mutations generated, 21 killed; no survivors or uncovered mutations |
 
-PIT reports 49/50 covered lines for mutated classes because it counts Demo's unused private constructor. JaCoCo filters that constructor and reports 100%. These tools use different coverage accounting; no production code was excluded to hide a pricing gap. With the current PIT configuration, no mutations were generated for the new ZoneRate constructor. Its validation is checked by direct tests and JaCoCo coverage; the 21-mutation result does not establish mutation coverage of those guards.
+PIT reports 50/51 covered lines for mutated classes because it counts Demo's unused private constructor. JaCoCo filters that constructor and reports 100%. These tools use different coverage accounting; no production code was excluded to hide a pricing gap. With the current PIT configuration, no mutations were generated for the new ZoneRate constructor. Its validation is checked by direct tests and JaCoCo coverage; the 21-mutation result does not establish mutation coverage of those guards.
 
 The tests give specific checks for a live rule change: `providesTheConfiguredRateAndHandlingFee` checks rate and fee values, `calculatesPriceFromZoneRateFeesAndService` checks totals and express behavior, and `addsHeavyItemSurchargeOnlyAboveThirtyKg` checks the surcharge boundary.
 
@@ -224,4 +224,8 @@ Rates, fees, surcharges and results now use BigDecimal. calculateCost returns a 
 
 Weights still enter the API as positive finite doubles and are converted with BigDecimal.valueOf. The calculation does not round them to whole kilograms, but it cannot recover precision lost before a caller supplied the double. Configured money values are built from decimal strings, never from new BigDecimal(double). HALF_UP is the chosen implementation policy and still needs business confirmation.
 
-The money tests assert exact values and the two-decimal scale, including rounding ties, decimal addition, large amounts and rounding only after express. The default PIT operators now generate 21 mutations rather than 25 because BigDecimal method calls replace primitive arithmetic. This score does not establish mutation testing of every decimal arithmetic operation; the rounding and arithmetic regression assertions provide additional checks.
+The money tests assert exact values and the two-decimal scale, including rounding ties, decimal addition and rounding only after express. The default PIT operators now generate 21 mutations rather than 25 because BigDecimal method calls replace primitive arithmetic. This score does not establish mutation testing of every decimal arithmetic operation; the rounding and arithmetic regression assertions provide additional checks.
+
+### Pre-submission cleanup
+
+The supplied hygiene review prompted an explicit null-rule stub, separation of the null guard from repository exception wrapping, consistent decimal literals and equality checks, and removal of the unrealistic beyond-double-range test. The README and POM now agree on the opt-in mutation command, and the baseline analysis points to the final results above. The current design was retained. Verification passed with 61 tests, full JaCoCo line/instruction/branch coverage and all 21 generated mutations caught.

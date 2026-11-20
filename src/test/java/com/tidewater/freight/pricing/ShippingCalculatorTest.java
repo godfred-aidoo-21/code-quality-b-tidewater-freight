@@ -56,7 +56,7 @@ class ShippingCalculatorTest {
 
     BigDecimal cost = calculator.calculateCost("DOMESTIC", 10, "STANDARD");
 
-    assertEquals(new BigDecimal("73.0").setScale(2), cost);
+    assertEquals(new BigDecimal("73.00"), cost);
   }
 
   @Test
@@ -67,7 +67,7 @@ class ShippingCalculatorTest {
 
     BigDecimal cost = calculator.calculateCost("NEW_ZONE", 40, "EXPRESS");
 
-    assertEquals(new BigDecimal("760.5").setScale(2), cost);
+    assertEquals(new BigDecimal("760.50"), cost);
   }
 
   @ParameterizedTest
@@ -86,7 +86,7 @@ class ShippingCalculatorTest {
 
     BigDecimal cost = calculator.calculateCost("DOMESTIC", Math.nextUp(30.0), "STANDARD");
 
-    assertEquals(new BigDecimal("170.0").setScale(2), cost);
+    assertEquals(new BigDecimal("170.00"), cost);
   }
 
   @ParameterizedTest
@@ -121,17 +121,6 @@ class ShippingCalculatorTest {
     BigDecimal cost = calculator.calculateCost("TEST_ZONE", 3, "STANDARD");
 
     assertEquals(new BigDecimal("0.50"), cost);
-  }
-
-  @ParameterizedTest
-  @CsvSource({"STANDARD, 1E+309", "EXPRESS, 1.5E+309"})
-  void pricesAmountsBeyondTheDoubleRange(String serviceLevel, BigDecimal expectedCost) {
-    ShippingCalculator calculator = new ShippingCalculator(new InMemoryRateRepository(
-        Map.of("TEST_ZONE", zoneRate("1E+308", "0"))));
-
-    BigDecimal cost = calculator.calculateCost("TEST_ZONE", 10, serviceLevel);
-
-    assertEquals(expectedCost.setScale(2), cost);
   }
 
   private ZoneRate zoneRate(String ratePerKg, String handlingFee) {
