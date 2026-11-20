@@ -79,7 +79,7 @@ PIT's threshold and reporting options are described in its
 
 ### Checking the build check
 
-The full profile passed with 48 tests and 25 of 25 mutations caught. JaCoCo
+When the check was introduced, the full profile passed with 48 tests and 25 of 25 mutations caught. JaCoCo
 reported 100% line, instruction and branch coverage.
 
 To check the failure path, pricing tests were temporarily excluded from PIT only:
@@ -93,3 +93,8 @@ Maven failed with `Mutation score of 88 is below threshold of 100`. No test file
 were edited for this experiment. A subsequent clean run with the full suite passed
 and replaced the experiment's reports. The exclusion command is a diagnostic check,
 not the command to use for normal verification.
+
+After adding ZoneRate validation, the full profile passes with 59 tests and the same
+25 mutations caught. JaCoCo still reports 100% line, instruction and branch coverage.
+PIT generated no mutations for the record constructor; its new guards are checked
+by direct tests, rather than included in that mutation score.

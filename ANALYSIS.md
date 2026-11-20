@@ -1,4 +1,4 @@
-﻿# Tidewater Freight: initial analysis
+# Tidewater Freight: initial analysis
 
 ## What happened when I ran the starter
 
@@ -143,6 +143,8 @@ The repository now returns a `ZoneRate` record containing the per-kilogram rate 
 
 The in-memory repository accepts a map of zone rules and copies it on construction. A caller changing its original map cannot change the repository's prices afterwards.
 
+ZoneRate now validates its values when constructed: the per-kilogram rate must be positive and finite, and the handling fee must be non-negative and finite. Invalid configuration throws IllegalArgumentException before the rules can reach the repository. Zero handling fees remain valid for domestic shipping. Focused tests check invalid values and valid fractional rates and fees.
+
 A new zone using the same formula can be added to the supplied map without editing `ShippingCalculator`. The test `calculatesNewZonePriceFromSuppliedRules` supplies NEW_ZONE with a rate of 12 and fee of 7. For 40 kg express, it checks `(12 x 40 + 7 + 20) x 1.5 = 760.5`.
 
 This addresses the known extension under OCP (section 12.2), without adding a framework that the current rules do not need (section 2.2). It has a limit: a zone with a different surcharge policy or calculation formula would need a behavior extension. The actual new zone's rules have not been supplied, so support for every possible future formula is not claimed.
@@ -176,7 +178,7 @@ A missing repository is rejected at construction. A calculated NaN or infinite a
 
 ### How the changes were checked
 
-The suite has **48 test executions across four test classes**. Parameterized methods account for many of those executions. It checks zone/service prices, heavy and fractional shipments, weights below/at/above the threshold, invalid inputs, overflow, failure propagation and preserved causes. Repository tests check configured values and the defensive copy. The demo test checks both successful output and rejection output, restoring the streams and formatting locale afterwards.
+The suite has **59 test executions across five test classes**. Parameterized methods account for many of those executions. It checks zone/service prices, heavy and fractional shipments, weights below/at/above the threshold, invalid inputs, overflow, failure propagation and preserved causes. Repository tests check configured values and the defensive copy. The demo test checks both successful output and rejection output, restoring the streams and formatting locale afterwards.
 
 Mockito is used for the repository seam, never to replace the calculator being tested. Interaction checks supplement assertions about prices or exceptions. Six repeated cases were removed after review, while the important behavior checks and measured coverage remained.
 
@@ -188,13 +190,13 @@ mvn clean verify -Pmutation-check
 
 | Check | Result |
 | --- | --- |
-| JUnit | 48 passed; no failures, errors or skipped tests |
-| JaCoCo instructions | 262 covered, 0 missed |
-| JaCoCo lines | 60 covered, 0 missed |
-| JaCoCo branches | 22 covered, 0 missed |
+| JUnit | 59 passed; no failures, errors or skipped tests |
+| JaCoCo instructions | 286 covered, 0 missed |
+| JaCoCo lines | 65 covered, 0 missed |
+| JaCoCo branches | 30 covered, 0 missed |
 | PIT | 25 mutations generated, 25 killed; no survivors or uncovered mutations |
 
-PIT reports 47/48 covered lines for mutated classes because it counts Demo's unused private constructor. JaCoCo filters that constructor and reports 100%. These tools use different coverage accounting; no production code was excluded to hide a pricing gap.
+PIT reports 47/48 covered lines for mutated classes because it counts Demo's unused private constructor. JaCoCo filters that constructor and reports 100%. These tools use different coverage accounting; no production code was excluded to hide a pricing gap. With the current PIT configuration, no mutations were generated for the new ZoneRate constructor. Its validation is checked by direct tests and JaCoCo coverage; the 25-mutation result does not establish mutation coverage of those guards.
 
 The tests give specific checks for a live rule change: `providesTheConfiguredRateAndHandlingFee` checks rate and fee values, `calculatesPriceFromZoneRateFeesAndService` checks totals and express behavior, and `addsHeavyItemSurchargeOnlyAboveThirtyKg` checks the surcharge boundary.
 
@@ -210,7 +212,7 @@ I checked the failure path with:
 mvn verify -Pmutation-check "-DexcludedTestClasses=com.tidewater.freight.pricing.*"
 ```
 
-All 48 ordinary tests passed, but excluding pricing tests from PIT allowed three mutations to survive. The score fell to 88%, and Maven failed with `Mutation score of 88 is below threshold of 100`. No source or test files were changed for this experiment. The subsequent full clean run passed and restored the final reports.
+When the profile was introduced, all 48 ordinary tests passed, but excluding pricing tests from PIT allowed three mutations to survive. The score fell to 88%, and Maven failed with `Mutation score of 88 is below threshold of 100`. No source or test files were changed for this experiment. The subsequent full clean run passed and restored the final reports.
 
 A 100% mutation score only covers PIT's generated mutations. Future equivalent mutations need investigation, not meaningless assertions or an unexplained threshold reduction. The profile is available for CI, but no hosted CI pipeline has been added.
 
@@ -218,4 +220,4 @@ A 100% mutation score only covers PIT's generated mutations. Future equivalent m
 
 The implementation accepts positive, finite fractional weights, with no invented business maximum. Zone lookup is exact and case-sensitive. Services must be exactly STANDARD or EXPRESS; input is not trimmed or normalized. These choices are documented implementation assumptions, not recorded business approval.
 
-The calculation still returns `double`. It does not round fractional weights or apply a final monetary rounding policy; only the demo formats prices to two decimal places. Decimal-money representation and payable rounding remain unresolved. The overflow check does not solve floating-point precision, and configured `ZoneRate` values are currently trusted rather than validated.
+The calculation still returns `double`. It does not round fractional weights or apply a final monetary rounding policy; only the demo formats prices to two decimal places. Decimal-money representation and payable rounding remain unresolved. The overflow check does not solve floating-point precision. Configured ZoneRate values are now validated as described above.
