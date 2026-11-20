@@ -4,32 +4,37 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.math.BigDecimal;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class ZoneRateTest {
   @ParameterizedTest
-  @ValueSource(doubles = {0, -1, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY})
-  void rejectsInvalidRatePerKilogram(double ratePerKg) {
+  @NullSource
+  @ValueSource(strings = {"0", "-1"})
+  void rejectsMissingOrNonPositiveRate(BigDecimal ratePerKg) {
     IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
-        () -> new ZoneRate(ratePerKg, 0));
+        () -> new ZoneRate(ratePerKg, BigDecimal.ZERO));
 
-    assertEquals("Rate per kilogram must be positive and finite", failure.getMessage());
+    assertEquals("Rate per kilogram must be present and positive", failure.getMessage());
   }
 
   @ParameterizedTest
-  @ValueSource(doubles = {-1, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY})
-  void rejectsInvalidHandlingFee(double handlingFee) {
+  @NullSource
+  @ValueSource(strings = {"-1"})
+  void rejectsMissingOrNegativeFee(BigDecimal handlingFee) {
     IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
-        () -> new ZoneRate(5, handlingFee));
+        () -> new ZoneRate(BigDecimal.ONE, handlingFee));
 
-    assertEquals("Handling fee must be non-negative and finite", failure.getMessage());
+    assertEquals("Handling fee must be present and non-negative", failure.getMessage());
   }
 
   @ParameterizedTest
-  @CsvSource({"0.5, 0.0", "0.5, 0.25"})
-  void acceptsFractionalRatesWithZeroOrPositiveFees(double ratePerKg, double handlingFee) {
+  @CsvSource({"0.5, 0.0", "0.005, 0.0025"})
+  void preservesFractionalRatesWithZeroOrPositiveFees(
+      BigDecimal ratePerKg, BigDecimal handlingFee) {
     ZoneRate rate = new ZoneRate(ratePerKg, handlingFee);
 
     assertAll(

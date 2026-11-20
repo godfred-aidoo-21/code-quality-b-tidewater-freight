@@ -5,12 +5,15 @@ import com.tidewater.freight.exception.RateLookupException;
 import com.tidewater.freight.exception.UnknownZoneException;
 import com.tidewater.freight.rates.RateRepository;
 import com.tidewater.freight.rates.ZoneRate;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Objects;
 
 public class ShippingCalculator {
   private static final double HEAVY_ITEM_THRESHOLD_KG = 30.0;
-  private static final double HEAVY_ITEM_SURCHARGE = 20.0;
-  private static final double EXPRESS_MULTIPLIER = 1.5;
+  private static final BigDecimal HEAVY_ITEM_SURCHARGE = new BigDecimal("20.00");
+  private static final BigDecimal EXPRESS_MULTIPLIER = new BigDecimal("1.5");
+  private static final int CURRENCY_SCALE = 2;
 
   private final RateRepository repository;
 
@@ -24,18 +27,17 @@ public class ShippingCalculator {
    * @throws InvalidShipmentException if shipment details are invalid
    * @throws UnknownZoneException if the zone is not configured
    * @throws RateLookupException if the rate source cannot supply rules
-   * @throws ArithmeticException if the calculated amount is not finite
+   * @return the final GHS amount, rounded once to two decimal places using HALF_UP
    */
-  public double calculateCost(String zone, double weightKg, String serviceLevel) {
+  public BigDecimal calculateCost(String zone, double weightKg, String serviceLevel) {
     validateShipment(zone, weightKg, serviceLevel);
     ZoneRate rate = findRate(zone);
-    double subtotal = rate.ratePerKg() * weightKg + rate.handlingFee();
-    subtotal += heavyItemSurcharge(weightKg);
-    double cost = serviceLevel.equals("EXPRESS") ? subtotal * EXPRESS_MULTIPLIER : subtotal;
-    if (!Double.isFinite(cost)) {
-      throw new ArithmeticException("Shipping cost is not finite for zone " + zone);
-    }
-    return cost;
+    BigDecimal subtotal = rate.ratePerKg().multiply(BigDecimal.valueOf(weightKg))
+        .add(rate.handlingFee())
+        .add(heavyItemSurcharge(weightKg));
+    BigDecimal cost = serviceLevel.equals("EXPRESS")
+        ? subtotal.multiply(EXPRESS_MULTIPLIER) : subtotal;
+    return cost.setScale(CURRENCY_SCALE, RoundingMode.HALF_UP);
   }
 
   private void validateShipment(String zone, double weightKg, String serviceLevel) {
@@ -62,7 +64,7 @@ public class ShippingCalculator {
     }
   }
 
-  private double heavyItemSurcharge(double weightKg) {
-    return weightKg > HEAVY_ITEM_THRESHOLD_KG ? HEAVY_ITEM_SURCHARGE : 0.0;
+  private BigDecimal heavyItemSurcharge(double weightKg) {
+    return weightKg > HEAVY_ITEM_THRESHOLD_KG ? HEAVY_ITEM_SURCHARGE : BigDecimal.ZERO;
   }
 }

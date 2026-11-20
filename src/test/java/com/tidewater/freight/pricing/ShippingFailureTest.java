@@ -11,7 +11,6 @@ import com.tidewater.freight.exception.InvalidShipmentException;
 import com.tidewater.freight.exception.RateLookupException;
 import com.tidewater.freight.exception.UnknownZoneException;
 import com.tidewater.freight.rates.RateRepository;
-import com.tidewater.freight.rates.ZoneRate;
 import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -57,7 +56,8 @@ class ShippingFailureTest {
   @Test
   void addsZoneContextToRateSourceFailureAndPreservesItsCause() {
     IOException sourceFailure = new IOException("Rate file could not be read");
-    RateLookupException lookupFailure = new RateLookupException("Rate source failed", sourceFailure);
+    RateLookupException lookupFailure =
+        new RateLookupException("Rate source failed", sourceFailure);
     when(repository.findRate("DOMESTIC")).thenThrow(lookupFailure);
 
     RateLookupException failure = assertThrows(RateLookupException.class,
@@ -94,26 +94,6 @@ class ShippingFailureTest {
         () -> new ShippingCalculator(null));
 
     assertEquals("Rate repository is required", failure.getMessage());
-  }
-
-  @Test
-  void rejectsAnOverflowedPrice() {
-    when(repository.findRate("DOMESTIC")).thenReturn(new ZoneRate(5, 0));
-
-    ArithmeticException failure = assertThrows(ArithmeticException.class,
-        () -> calculator.calculateCost("DOMESTIC", Double.MAX_VALUE, "STANDARD"));
-
-    assertEquals("Shipping cost is not finite for zone DOMESTIC", failure.getMessage());
-  }
-
-  @Test
-  void rejectsOverflowCausedByTheExpressMultiplier() {
-    when(repository.findRate("DOMESTIC")).thenReturn(new ZoneRate(1, 0));
-
-    ArithmeticException failure = assertThrows(ArithmeticException.class,
-        () -> calculator.calculateCost("DOMESTIC", Double.MAX_VALUE, "EXPRESS"));
-
-    assertEquals("Shipping cost is not finite for zone DOMESTIC", failure.getMessage());
   }
 
   @Test

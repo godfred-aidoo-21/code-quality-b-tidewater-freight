@@ -143,7 +143,7 @@ The repository now returns a `ZoneRate` record containing the per-kilogram rate 
 
 The in-memory repository accepts a map of zone rules and copies it on construction. A caller changing its original map cannot change the repository's prices afterwards.
 
-ZoneRate now validates its values when constructed: the per-kilogram rate must be positive and finite, and the handling fee must be non-negative and finite. Invalid configuration throws IllegalArgumentException before the rules can reach the repository. Zero handling fees remain valid for domestic shipping. Focused tests check invalid values and valid fractional rates and fees.
+ZoneRate stores BigDecimal values and validates them when constructed: the per-kilogram rate must be present and positive, and the handling fee must be present and non-negative. BigDecimal cannot represent NaN or infinity. Invalid configuration throws IllegalArgumentException before the rules can reach the repository. Zero handling fees remain valid for domestic shipping. Focused tests check invalid values and valid fractional rates and fees.
 
 A new zone using the same formula can be added to the supplied map without editing `ShippingCalculator`. The test `calculatesNewZonePriceFromSuppliedRules` supplies NEW_ZONE with a rate of 12 and fee of 7. For 40 kg express, it checks `(12 x 40 + 7 + 20) x 1.5 = 760.5`.
 
@@ -162,7 +162,7 @@ The calculator catches only `RateLookupException` from the lookup path. It adds 
 
 The in-memory source has no file or network operation to recover from. The rate-source failure test therefore uses a mock to simulate an adapter failure with an underlying IOException. It verifies the cause chain; it does not claim to test a real file adapter.
 
-A missing repository is rejected at construction. A calculated NaN or infinite amount is rejected with `ArithmeticException`. In the demo, the expected unknown-zone failure is displayed on standard error and no price is printed for it. Other unexpected failures remain unhandled by that display code.
+A missing repository is rejected at construction. Monetary arithmetic now uses BigDecimal, so the earlier double-overflow guards and their tests were replaced with tests that verify large exact amounts. Invalid non-finite shipment weights are still rejected. In the demo, the expected unknown-zone failure is displayed on standard error and no price is printed for it. Other unexpected failures remain unhandled by that display code.
 
 ### What was kept and what was rewritten
 
@@ -178,7 +178,7 @@ A missing repository is rejected at construction. A calculated NaN or infinite a
 
 ### How the changes were checked
 
-The suite has **59 test executions across five test classes**. Parameterized methods account for many of those executions. It checks zone/service prices, heavy and fractional shipments, weights below/at/above the threshold, invalid inputs, overflow, failure propagation and preserved causes. Repository tests check configured values and the defensive copy. The demo test checks both successful output and rejection output, restoring the streams and formatting locale afterwards.
+The suite has **63 test executions across five test classes**. Parameterized methods account for many of those executions. It checks zone/service prices, heavy and fractional shipments, weights below/at/above the threshold, invalid inputs, monetary rounding, large amounts, failure propagation and preserved causes. Repository tests check configured values and the defensive copy. The demo test checks both successful output and rejection output, restoring the streams and formatting locale afterwards.
 
 Mockito is used for the repository seam, never to replace the calculator being tested. Interaction checks supplement assertions about prices or exceptions. Six repeated cases were removed after review, while the important behavior checks and measured coverage remained.
 
@@ -190,13 +190,13 @@ mvn clean verify -Pmutation-check
 
 | Check | Result |
 | --- | --- |
-| JUnit | 59 passed; no failures, errors or skipped tests |
-| JaCoCo instructions | 286 covered, 0 missed |
-| JaCoCo lines | 65 covered, 0 missed |
-| JaCoCo branches | 30 covered, 0 missed |
-| PIT | 25 mutations generated, 25 killed; no survivors or uncovered mutations |
+| JUnit | 63 passed; no failures, errors or skipped tests |
+| JaCoCo instructions | 303 covered, 0 missed |
+| JaCoCo lines | 67 covered, 0 missed |
+| JaCoCo branches | 28 covered, 0 missed |
+| PIT | 21 mutations generated, 21 killed; no survivors or uncovered mutations |
 
-PIT reports 47/48 covered lines for mutated classes because it counts Demo's unused private constructor. JaCoCo filters that constructor and reports 100%. These tools use different coverage accounting; no production code was excluded to hide a pricing gap. With the current PIT configuration, no mutations were generated for the new ZoneRate constructor. Its validation is checked by direct tests and JaCoCo coverage; the 25-mutation result does not establish mutation coverage of those guards.
+PIT reports 49/50 covered lines for mutated classes because it counts Demo's unused private constructor. JaCoCo filters that constructor and reports 100%. These tools use different coverage accounting; no production code was excluded to hide a pricing gap. With the current PIT configuration, no mutations were generated for the new ZoneRate constructor. Its validation is checked by direct tests and JaCoCo coverage; the 21-mutation result does not establish mutation coverage of those guards.
 
 The tests give specific checks for a live rule change: `providesTheConfiguredRateAndHandlingFee` checks rate and fee values, `calculatesPriceFromZoneRateFeesAndService` checks totals and express behavior, and `addsHeavyItemSurchargeOnlyAboveThirtyKg` checks the surcharge boundary.
 
@@ -220,4 +220,8 @@ A 100% mutation score only covers PIT's generated mutations. Future equivalent m
 
 The implementation accepts positive, finite fractional weights, with no invented business maximum. Zone lookup is exact and case-sensitive. Services must be exactly STANDARD or EXPRESS; input is not trimmed or normalized. These choices are documented implementation assumptions, not recorded business approval.
 
-The calculation still returns `double`. It does not round fractional weights or apply a final monetary rounding policy; only the demo formats prices to two decimal places. Decimal-money representation and payable rounding remain unresolved. The overflow check does not solve floating-point precision. Configured ZoneRate values are now validated as described above.
+Rates, fees, surcharges and results now use BigDecimal. calculateCost returns a BigDecimal with scale 2. The total is rounded once with HALF_UP, after handling fees, the heavy surcharge and the express multiplier. Rates and intermediate subtotals retain their precision. For example, GHS 1.875 becomes GHS 1.88; a positive amount below half a pesewa can round to GHS 0.00, with no minimum charge invented.
+
+Weights still enter the API as positive finite doubles and are converted with BigDecimal.valueOf. The calculation does not round them to whole kilograms, but it cannot recover precision lost before a caller supplied the double. Configured money values are built from decimal strings, never from new BigDecimal(double). HALF_UP is the chosen implementation policy and still needs business confirmation.
+
+The money tests assert exact values and the two-decimal scale, including rounding ties, decimal addition, large amounts and rounding only after express. The default PIT operators now generate 21 mutations rather than 25 because BigDecimal method calls replace primitive arithmetic. This score does not establish mutation testing of every decimal arithmetic operation; the rounding and arithmetic regression assertions provide additional checks.

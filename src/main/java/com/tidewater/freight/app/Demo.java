@@ -4,6 +4,7 @@ import com.tidewater.freight.exception.UnknownZoneException;
 import com.tidewater.freight.pricing.ShippingCalculator;
 import com.tidewater.freight.rates.InMemoryRateRepository;
 import com.tidewater.freight.rates.RateRepository;
+import java.math.BigDecimal;
 
 public class Demo {
   private Demo() {}
@@ -20,7 +21,7 @@ public class Demo {
   private static void printCost(
       ShippingCalculator calculator, String zone, double weightKg, String serviceLevel) {
     try {
-      double cost = calculator.calculateCost(zone, weightKg, serviceLevel);
+      BigDecimal cost = calculator.calculateCost(zone, weightKg, serviceLevel);
       System.out.printf(
           "Result %s %.1fkg %s -> GHS %.2f%n", zone, weightKg, serviceLevel, cost);
     } catch (UnknownZoneException e) {
