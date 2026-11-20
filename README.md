@@ -100,34 +100,34 @@ existing zones that should remain available. The calculator needs no changes.
 
 ```text
 .
-|-- ANALYSIS.md                         # Diagnosis, decisions and verification evidence
-|-- README.md                           # Project overview and run commands
-|-- pom.xml                             # Dependencies, build and quality checks
-|-- .gitignore                          # Files excluded from Git
+|-- ANALYSIS.md                                  # Diagnosis, decisions and verification evidence
+|-- README.md                                    # Project overview and run commands
+|-- pom.xml                                      # Dependencies, build and quality checks
+|-- .gitignore                                   # Files excluded from Git
 `-- src/
     |-- main/java/com/tidewater/freight/
     |   |-- app/
-    |   |   `-- Demo.java                # Runs examples and displays prices or errors
+    |   |   `-- Demo.java                        # Runs examples and displays prices or errors
     |   |-- pricing/
-    |   |   `-- ShippingCalculator.java  # Validates shipments and calculates rounded costs
+    |   |   `-- ShippingCalculator.java          # Validates shipments and calculates rounded costs
     |   |-- rates/
-    |   |   |-- RateRepository.java      # Contract for retrieving zone rules
-    |   |   |-- InMemoryRateRepository.java # Stores and looks up configured rules
-    |   |   `-- ZoneRate.java            # Holds and validates decimal rates and fees
+    |   |   |-- RateRepository.java              # Contract for retrieving zone rules
+    |   |   |-- InMemoryRateRepository.java      # Stores and looks up configured rules
+    |   |   `-- ZoneRate.java                    # Holds and validates decimal rates and fees
     |   `-- exception/
-    |       |-- ShippingException.java   # Parent for shipping failures
-    |       |-- InvalidShipmentException.java # Invalid shipment details
-    |       |-- UnknownZoneException.java # Zone has no configured rules
-    |       `-- RateLookupException.java # Rate-source failure, with cause and context
+    |       |-- ShippingException.java           # Parent for shipping failures
+    |       |-- InvalidShipmentException.java    # Invalid shipment details
+    |       |-- UnknownZoneException.java        # Zone has no configured rules
+    |       `-- RateLookupException.java         # Rate-source failure, with cause and context
     `-- test/java/com/tidewater/freight/
         |-- app/
-        |   `-- DemoTest.java            # Checks price and rejection output
+        |   `-- DemoTest.java                    # Checks price and rejection output
         |-- pricing/
-        |   |-- ShippingCalculatorTest.java # Checks prices, boundaries and rounding
-        |   `-- ShippingFailureTest.java # Checks validation and failure propagation
+        |   |-- ShippingCalculatorTest.java      # Checks prices, boundaries and rounding
+        |   `-- ShippingFailureTest.java         # Checks validation and failure propagation
         `-- rates/
-            |-- InMemoryRateRepositoryTest.java # Checks rules and defensive copying
-            `-- ZoneRateTest.java        # Checks valid and invalid rates and fees
+            |-- InMemoryRateRepositoryTest.java  # Checks rules and defensive copying
+            `-- ZoneRateTest.java                # Checks valid and invalid rates and fees
 ```
 
 ## Tests and verification
@@ -199,7 +199,7 @@ Weight enters the API as a `double` and is converted with `BigDecimal.valueOf`.
 This avoids introducing binary floating-point arithmetic into the money calculation,
 but cannot recover precision already lost in the caller's weight value. Construct
 configured monetary values from decimal strings and retain the `BigDecimal` result.
-
-No hosted CI workflow has been added. Mutation-score enforcement is opt-in:
+ 
+Mutation-score enforcement is opt-in:
 `mvn verify` generates coverage but does not run or enforce PIT. Use
 `mvn clean verify -Pmutation-check` for the full quality check.
